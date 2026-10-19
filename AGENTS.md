@@ -41,9 +41,9 @@ herdr's layout rect (`herdr pane layout`) and sends `terminal.release`. Control 
   create per terminal_id; ambiguous Orca failures are never retried automatically.
 - Config `~/.config/herdr/plugins/config/csqc.orca-mirror/config.toml` (`include_paths` empty = all repos).
   A broken config disables syncing.
-- Do not modify `/Users/csqc/src/herdr-orca` (legacy plugin) or its config/daemon.
+- Do not modify the legacy `rudironsoni.herdr-orca-sync` plugin checkout or its config/daemon.
 - Orca CLI has no `repo rm`; `orca worktree rm` deletes the git worktree too — never call it.
-- Test in dedicated herdr workspaces on `/Users/csqc/src/orca-mirror-testrepo`; close only what you created.
+- Test in dedicated herdr workspaces on a throwaway repo (e.g. `~/src/orca-mirror-testrepo`); close only what you created.
 - Orca can bring back a closed/replaced tab (restored layout, fresh shell, sometimes an auto-resumed agent).
   Tab ids replaced by `upgrade-tabs` are kept in `state.retiredTabs`; every sync closes those tabs when they
   show up idle (no attach, no agent, screen at a prompt). Retired tabs running an agent are left alone.
