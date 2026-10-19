@@ -1,0 +1,19 @@
+{
+  "name": "orca-mirror",
+  "version": "0.1.0",
+  "private": true,
+  "description": "herdr plugin that shows herdr terminals as tabs in the matching Orca worktree",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "test": "node --disable-warning=ExperimentalWarning --test \"tests/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3"
+  }
+}

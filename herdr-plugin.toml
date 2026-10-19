@@ -1,0 +1,37 @@
+id = "csqc.orca-mirror"
+name = "Orca Mirror"
+version = "0.3.0"
+min_herdr_version = "0.9.1"
+description = "Show herdr terminals as tabs in the matching Orca worktree. herdr owns the processes; Orca only displays them."
+platforms = ["macos"]
+
+[[startup]]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "sync", "--reason", "startup"]
+
+[[events]]
+on = "pane.created"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "sync", "--reason", "pane.created"]
+
+[[actions]]
+id = "open"
+title = "Orca Mirror: open this terminal in Orca"
+contexts = ["pane"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "open", "--notify"]
+
+[[actions]]
+id = "sync"
+title = "Orca Mirror: sync now"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "sync", "--reason", "action", "--no-coalesce"]
+
+[[actions]]
+id = "doctor"
+title = "Orca Mirror: doctor"
+command = ["sh", "-c", "exec \"${HERDR_BIN_PATH:-herdr}\" plugin pane open --plugin csqc.orca-mirror --entrypoint doctor"]
+
+[[panes]]
+id = "doctor"
+title = "Orca Mirror doctor"
+placement = "popup"
+width = "90%"
+height = "80%"
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "doctor", "--pause"]
