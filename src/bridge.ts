@@ -176,9 +176,14 @@ export class Bridge {
     this.send({ type: "terminal.input", bytes: Buffer.from(text, "binary").toString("base64") });
   }
 
+  /**
+   * A resize of this Orca pane means someone is looking at it here (e.g. Orca's iOS app opened it), so take
+   * the size like herdr does for its own clients: the most recently active viewer wins. herdr hands the
+   * size back to its own UI as soon as the user interacts there.
+   */
   private handleResize(): void {
     if (this.stream?.kind === "control") this.send({ type: "terminal.resize", ...this.size() });
-    else this.open("observe");
+    else this.open("control");
   }
 
   private checkIdle(): void {

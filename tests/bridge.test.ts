@@ -125,15 +125,13 @@ test("losing control to another client falls back to read-only instead of ending
   assert.equal(h.bridge.mode, "observe");
 });
 
-test("a resize re-opens the observer at the new size, or resizes while in control", async () => {
+test("a resize of the Orca pane (e.g. Orca iOS opening it) takes control at the new size; later resizes follow", async () => {
   const h = harness();
   void h.bridge.run();
   h.output.columns = 80;
   h.output.emit("resize");
   await new Promise((r) => setTimeout(r, 150));
-  assert.deepEqual(last(h).args.slice(4), ["--cols", "80", "--rows", "30"]);
-  h.input.write("a");
-  await tick();
+  assert.deepEqual(last(h).args, ["terminal", "session", "control", "term_a", "--cols", "80", "--rows", "30", "--takeover"]);
   h.output.rows = 20;
   h.output.emit("resize");
   await new Promise((r) => setTimeout(r, 150));
