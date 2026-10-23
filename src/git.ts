@@ -12,9 +12,14 @@ export function canonical(path: string): string {
   }
 }
 
+function normPath(path: string): string {
+  const s = canonical(path).replace(/\\/g, "/").replace(/\/+$/, "");
+  return /^[A-Za-z]:/.test(s) ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s;
+}
+
 export function isInside(path: string, root: string): boolean {
-  const p = canonical(path);
-  const r = canonical(root).replace(/\/+$/, "");
+  const p = normPath(path);
+  const r = normPath(root);
   return p === r || p.startsWith(`${r}/`);
 }
 
@@ -24,7 +29,7 @@ export function resolveGit(run: Runner, cwd: string): GitInfo | null {
     timeoutMs: 10_000,
   });
   if (r.status !== 0) return null;
-  const [top, common] = r.stdout.trim().split("\n");
+  const [top, common] = r.stdout.trim().split(/\r?\n/);
   if (!top || !common || basename(common) !== ".git") return null;
   return { worktreePath: canonical(top), repoRoot: canonical(dirname(common)) };
 }

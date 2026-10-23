@@ -14,7 +14,7 @@ import {
   retiredToClose,
   visibilityActions,
 } from "../src/reconcile.ts";
-import { orcaAppFromLauncher } from "../src/orca.ts";
+import { orcaAppFromLauncher, orcaWinDirFromLauncher } from "../src/orca.ts";
 import { emptyState, type State } from "../src/state.ts";
 import { makeWorld, snapshotJson } from "./helpers.ts";
 
@@ -233,12 +233,17 @@ test("visibilityActions: per-source hidden worktrees are imported, external ones
   assert.deepEqual(plan.missingRepos, ["/t"]);
 });
 
-test("orcaAppFromLauncher finds the app bundle", () => {
+test("orcaAppFromLauncher finds the app bundle and orcaWinDirFromLauncher finds the Windows install dir", () => {
   assert.equal(orcaAppFromLauncher("/Volumes/X/Applications/Orca.app/Contents/Resources/bin/orca"), "/Volumes/X/Applications/Orca.app");
   assert.equal(orcaAppFromLauncher("/usr/local/bin/orca"), null);
+  assert.equal(
+    orcaWinDirFromLauncher("C:\\Users\\Administrator\\AppData\\Local\\Programs\\orca\\resources\\bin\\orca.exe"),
+    "C:\\Users\\Administrator\\AppData\\Local\\Programs\\orca",
+  );
 });
 
 test("worktrees under .claude/worktrees are hidden by Orca's per-source policy", () => {
   assert.equal(hiddenBySource("/r/.claude/worktrees/x", "/r"), "claude");
+  assert.equal(hiddenBySource("F:\\r\\.claude\\worktrees\\x", "F:\\r"), "claude");
   assert.equal(hiddenBySource("/home/u/.herdr/worktrees/r/x", "/r"), null);
 });

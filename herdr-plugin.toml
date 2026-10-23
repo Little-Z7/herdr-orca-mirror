@@ -3,7 +3,7 @@ name = "Orca Mirror"
 version = "0.3.0"
 min_herdr_version = "0.9.1"
 description = "Show herdr terminals as tabs in the matching Orca worktree. herdr owns the processes; Orca only displays them."
-platforms = ["macos"]
+platforms = ["macos", "windows"]
 
 [[startup]]
 command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "sync", "--reason", "startup"]
@@ -26,7 +26,7 @@ command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "sync
 [[actions]]
 id = "doctor"
 title = "Orca Mirror: doctor"
-command = ["sh", "-c", "exec \"${HERDR_BIN_PATH:-herdr}\" plugin pane open --plugin csqc.orca-mirror --entrypoint doctor"]
+command = ["node", "--disable-warning=ExperimentalWarning", "src/main.ts", "doctor", "--open-pane"]
 
 [[panes]]
 id = "doctor"

@@ -10,6 +10,7 @@ export type AttachLoopDeps = {
   sleep(ms: number): Promise<void>;
   now(): number;
   log(message: string): void;
+  onTerminalChange?(terminalId: string): void;
 };
 
 export const RECONNECT_WINDOW_MS = 30_000;
@@ -39,7 +40,10 @@ export async function runAttachLoop(paneId: string, terminalId: string, deps: At
       deps.log(`orca-mirror: herdr did not come back within ${RECONNECT_WINDOW_MS / 1000}s; closing this tab`);
       return 1;
     }
-    if (next !== current) deps.log(`orca-mirror: herdr replaced ${current} with ${next} (live update); reattaching ${paneId}`);
+    if (next !== current) {
+      deps.log(`orca-mirror: herdr replaced ${current} with ${next} (live update); reattaching ${paneId}`);
+      deps.onTerminalChange?.(next);
+    }
     current = next;
   }
 }

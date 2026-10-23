@@ -53,8 +53,9 @@ function legacyInfo(deps: Deps, home: string): DoctorReport["legacy"] {
 }
 
 function hiddenReason(path: string): string {
-  if (path.includes("/.claude/worktrees/")) return 'hidden by Orca\'s "Claude Code" worktree source (show it in Orca\'s non-Orca worktrees dialog)';
-  if (path.includes("/.gsd-workspaces/")) return 'hidden by Orca\'s "GSD" worktree source';
+  const norm = path.replace(/\\/g, "/");
+  if (norm.includes("/.claude/worktrees/")) return 'hidden by Orca\'s "Claude Code" worktree source (show it in Orca\'s non-Orca worktrees dialog)';
+  if (norm.includes("/.gsd-workspaces/")) return 'hidden by Orca\'s "GSD" worktree source';
   return "external worktrees are hidden for this repo (orca repo set --repo path:<repo> --external-worktree-visibility show)";
 }
 
@@ -127,9 +128,10 @@ export function runDoctor(deps: Deps, home = homedir()): DoctorReport {
   }
 
   const candidates = obs.herdr.panes.filter((p) => obs.statuses.get(p.terminalId)?.kind === "candidate");
-  const resolved = resolveTargets(deps, obs.herdr, candidates, config.includePaths);
+  const repos = candidates.length ? deps.orca.listRepos() : [];
+  const resolved = resolveTargets(deps, obs.herdr, candidates, config.includePaths, repos);
   const sink = { notes: [] as string[], errors: [] as string[] };
-  const ensured = ensureRepos(deps, resolved.targets, resolved.targets.length ? deps.orca.listRepos() : [], config, obs.state, sink, true);
+  const ensured = ensureRepos(deps, resolved.targets, repos, config, obs.state, sink, true);
   const reasonText: Record<string, string> = {
     no_cwd: "herdr reports no cwd",
     not_git: "not inside a git checkout (no Orca worktree)",

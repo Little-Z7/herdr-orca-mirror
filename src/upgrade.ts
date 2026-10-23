@@ -42,7 +42,7 @@ export function runUpgradeTabs(
   // Wait for the attach clients and any old-style loop that owned them (it exits on its own) to go away.
   const ids = new Set(targets.map((t) => t.terminalId));
   const panes = new Set(targets.map((t) => t.paneId).filter(Boolean));
-  const lingering = () => scanAttachProcesses(deps.run).some((a) => ids.has(a.terminalId) || (a.paneId !== null && panes.has(a.paneId)));
+  const lingering = () => scanAttachProcesses(deps.run, { stateDir: deps.stateDir }).some((a) => ids.has(a.terminalId) || (a.paneId !== null && panes.has(a.paneId)));
   for (let i = 0; i < 100 && (targets.some((t) => deps.alive(t.pid)) || lingering()); i += 1) deps.sleep(100);
   deps.sleep(500);
   const sync = runSync(deps, { dryRun: false, reason: "upgrade-tabs", startedAt: deps.now(), coalesce: false });

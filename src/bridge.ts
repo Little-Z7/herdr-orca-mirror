@@ -209,5 +209,5 @@ export class Bridge {
 }
 
 export function spawnHerdrStream(herdrBin: string): (args: string[]) => ChildProcess {
-  return (args) => spawn(herdrBin, args, { stdio: ["pipe", "pipe", "ignore"] });
+  return (args) => spawn(herdrBin, args, { stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
 }

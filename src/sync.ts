@@ -17,7 +17,7 @@ import {
   type Target,
   type WorktreeRef,
 } from "./reconcile.ts";
-import { shQuote, type Runner } from "./run.ts";
+import { psQuote, shQuote, type Runner } from "./run.ts";
 import { loadState, saveState, withLock, type Entry, type State } from "./state.ts";
 
 export const PLUGIN_ID = "csqc.orca-mirror";
@@ -60,8 +60,14 @@ export type Observation = {
   now: number;
 };
 
-export function defaultDirs(env: NodeJS.ProcessEnv): { stateDir: string; configDir: string } {
+export function defaultDirs(env: NodeJS.ProcessEnv, platform: NodeJS.Platform = process.platform): { stateDir: string; configDir: string } {
   const home = homedir();
+  if (platform === "win32") {
+    return {
+      stateDir: env.HERDR_PLUGIN_STATE_DIR || join(env.LOCALAPPDATA || join(home, "AppData/Local"), "herdr/plugins", PLUGIN_ID),
+      configDir: env.HERDR_PLUGIN_CONFIG_DIR || join(env.APPDATA || join(home, "AppData/Roaming"), "herdr/plugins/config", PLUGIN_ID),
+    };
+  }
   return {
     stateDir: env.HERDR_PLUGIN_STATE_DIR || join(env.XDG_STATE_HOME || join(home, ".local/state"), "herdr/plugins", PLUGIN_ID),
     configDir: env.HERDR_PLUGIN_CONFIG_DIR || join(env.XDG_CONFIG_HOME || join(home, ".config"), "herdr/plugins/config", PLUGIN_ID),
@@ -86,9 +92,15 @@ export function attachCommand(
   deps: Pick<Deps, "nodeBin" | "mainPath" | "herdrBin" | "socketPath">,
   paneId: string,
   terminalId: string,
+  platform?: NodeJS.Platform,
 ): string {
   if (!/^term_[A-Za-z0-9]+$/.test(terminalId)) throw new Error(`refusing unexpected terminal id ${terminalId}`);
   if (!/^[A-Za-z0-9]+:[A-Za-z0-9]+$/.test(paneId)) throw new Error(`refusing unexpected pane id ${paneId}`);
+  const isWin = (platform ?? (/^[A-Za-z]:|\.exe$/i.test(deps.nodeBin) ? "win32" : "darwin")) === "win32";
+  if (isWin) {
+    const env = deps.socketPath ? `$env:HERDR_SOCKET_PATH = ${psQuote(deps.socketPath)}; ` : "";
+    return `${env}& ${psQuote(deps.nodeBin)} --disable-warning=ExperimentalWarning ${psQuote(deps.mainPath)} attach --pane ${paneId} --terminal ${terminalId} --herdr ${psQuote(deps.herdrBin)}; exit $LASTEXITCODE`;
+  }
   const env = deps.socketPath ? `env HERDR_SOCKET_PATH=${shQuote(deps.socketPath)} ` : "";
   return `exec ${env}${shQuote(deps.nodeBin)} --disable-warning=ExperimentalWarning ${shQuote(deps.mainPath)} attach --pane ${paneId} --terminal ${terminalId} --herdr ${shQuote(deps.herdrBin)}`;
 }
@@ -103,7 +115,7 @@ export function observe(deps: Deps, state: State): Observation | null {
   if (!deps.orca.reachable()) return null;
   const orcaList = deps.orca.listTerminals();
   if (orcaList.truncated) throw new Error("orca terminal list was truncated; refusing to create tabs");
-  const attach = scanAttachProcesses(deps.run);
+  const attach = scanAttachProcesses(deps.run, { stateDir: deps.stateDir });
   const now = deps.now();
   const statuses = classify({ panes: herdr.panes, orcaTerminals: orcaList.terminals, attach, state, now });
   return {
@@ -149,8 +161,8 @@ function syncLocked(deps: Deps, opts: SyncOptions, config: Config, report: SyncR
   for (const s of obs.statuses.values()) report.counts[s.kind] = (report.counts[s.kind] ?? 0) + 1;
   if (config.mirrorSidebar) mirrorSidebar(deps, obs.herdr, config, state, report, opts.dryRun);
   const candidates = obs.herdr.panes.filter((p) => obs.statuses.get(p.terminalId)?.kind === "candidate");
-  const resolved = resolveTargets(deps, obs.herdr, candidates, config.includePaths);
-  const repos = resolved.targets.length > 0 ? deps.orca.listRepos() : [];
+  const repos = candidates.length > 0 ? deps.orca.listRepos() : [];
+  const resolved = resolveTargets(deps, obs.herdr, candidates, config.includePaths, repos);
   const ensured = ensureRepos(deps, resolved.targets, repos, config, state, report, opts.dryRun);
   for (const reason of [...resolved.skipped.values(), ...ensured.skipped.values()]) {
     report.counts[`skipped_${reason}`] = (report.counts[`skipped_${reason}`] ?? 0) + 1;
@@ -263,14 +275,19 @@ export function anchorsOf(obs: Observation): {
   return { anchors, handles };
 }
 
-/** A herdr worktree workspace pins its panes to that checkout; other panes follow their cwd's git checkout. */
+/** A herdr worktree workspace pins its panes to that checkout; other panes follow their cwd's git checkout (or an Orca folder project). */
 export function resolveTargets(
   deps: Deps,
   herdr: HerdrSnapshot,
   panes: HerdrPane[],
   includePaths: string[],
+  repos: OrcaRepo[] = [],
 ): { targets: Target[]; skipped: Map<string, SkipReason> } {
   const gitCache = new Map<string, GitInfo | null>();
+  const folderRepos = repos
+    .filter((r) => r.kind === "folder")
+    .map((r) => canonical(r.path))
+    .sort((a, b) => b.length - a.length);
   const targets: Target[] = [];
   const skipped = new Map<string, SkipReason>();
   for (const pane of panes) {
@@ -285,6 +302,10 @@ export function resolveTargets(
     if (!git && pane.cwd) {
       if (!gitCache.has(pane.cwd)) gitCache.set(pane.cwd, resolveGit(deps.run, pane.cwd));
       git = gitCache.get(pane.cwd);
+      if (!git) {
+        const folder = folderRepos.find((r) => isInside(pane.cwd!, r));
+        if (folder) git = { worktreePath: folder, repoRoot: folder };
+      }
     }
     if (!git) {
       skipped.set(pane.terminalId, "not_git");

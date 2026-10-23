@@ -14,7 +14,7 @@ Orca worktree. herdr owns the processes; Orca only displays them. One-way: herdr
 
 ## Requirements
 
-macOS, herdr ≥ 0.9.1, Orca ≥ 1.4.229 (with the `orca` CLI on PATH), Node ≥ 22.18 (runs TypeScript directly).
+macOS or Windows, herdr ≥ 0.9.1, Orca ≥ 1.4.209, Node ≥ 22.18 (runs TypeScript directly).
 
 ## Install
 

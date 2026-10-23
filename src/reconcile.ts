@@ -37,7 +37,10 @@ export function classify(input: {
       (p) => (p.terminalId === id || (p.paneId !== null && p.paneId === pane.paneId)) && p.inOrca !== false,
     );
     if (shown.length > 0) {
-      const orca = shown.map((p) => (p.paneKey ? byPaneKey.get(p.paneKey) : undefined)).find(Boolean) ?? null;
+      const orca =
+        shown.map((p) => (p.paneKey ? byPaneKey.get(p.paneKey) : undefined)).find(Boolean) ??
+        (input.state.terminals[id]?.paneKey ? byPaneKey.get(input.state.terminals[id]?.paneKey ?? null) : undefined) ??
+        null;
       out.set(id, { kind: "paired", orca });
       continue;
     }
@@ -237,8 +240,9 @@ export function visibilityActions(
 
 /** Orca hides worktrees under these per-checkout folders by a separate per-source policy the CLI cannot change. */
 export function hiddenBySource(worktreePath: string, repoRoot: string): string | null {
-  const root = repoRoot.replace(/\/+$/, "");
-  if (worktreePath.startsWith(`${root}/.claude/worktrees/`)) return "claude";
-  if (worktreePath.startsWith(`${root}/.gsd-workspaces/`)) return "gsd";
+  const wt = worktreePath.replace(/\\/g, "/");
+  const root = repoRoot.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (wt.startsWith(`${root}/.claude/worktrees/`)) return "claude";
+  if (wt.startsWith(`${root}/.gsd-workspaces/`)) return "gsd";
   return null;
 }

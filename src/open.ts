@@ -51,11 +51,12 @@ export function runOpen(deps: Deps & { sleep: (ms: number) => void }, opts: Open
     }
     if (status?.kind === "pending") return { waitFor: { ...base, handle: obs.state.terminals[pane.terminalId]?.handle ?? null } };
 
-    const resolved = resolveTargets(deps, obs.herdr, [pane], []);
+    const repos = deps.orca.listRepos();
+    const resolved = resolveTargets(deps, obs.herdr, [pane], [], repos);
     const why = resolved.skipped.get(pane.terminalId);
     if (why) return { ok: false, created: false, ...base, message: `cannot open in Orca: ${REASON_TEXT[why] ?? why}` };
     const notes = { notes: [] as string[], errors: [] as string[] };
-    const ensured = ensureRepos(deps, resolved.targets, deps.orca.listRepos(), config, obs.state, notes, false);
+    const ensured = ensureRepos(deps, resolved.targets, repos, config, obs.state, notes, false);
     const blocked = ensured.skipped.get(pane.terminalId);
     if (blocked) return { ok: false, created: false, ...base, message: `cannot open in Orca: ${REASON_TEXT[blocked] ?? blocked} ${notes.errors.join("; ")}`.trim() };
     const { anchors, handles } = anchorsOf(obs);

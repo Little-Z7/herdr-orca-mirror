@@ -32,6 +32,14 @@ test("attachCommand execs our attach loop and rejects unexpected ids", () => {
     "exec '/usr/bin/node' --disable-warning=ExperimentalWarning '/x/src/main.ts' attach --pane w1:p1 --terminal term_abc --herdr '/opt/homebrew/bin/herdr'",
   );
   assert.match(attachCommand({ ...BINS, socketPath: "/tmp/s.sock" }, "w1:p1", "term_abc"), /^exec env HERDR_SOCKET_PATH='\/tmp\/s.sock' /);
+  assert.equal(
+    attachCommand(
+      { nodeBin: "C:\\nvm4w\\nodejs\\node.exe", mainPath: "C:\\p\\src\\main.ts", herdrBin: "C:\\Herdr\\herdr.exe", socketPath: null },
+      "w1:p1",
+      "term_abc",
+    ),
+    "& 'C:\\nvm4w\\nodejs\\node.exe' --disable-warning=ExperimentalWarning 'C:\\p\\src\\main.ts' attach --pane w1:p1 --terminal term_abc --herdr 'C:\\Herdr\\herdr.exe'; exit $LASTEXITCODE",
+  );
   assert.throws(() => attachCommand(BINS, "w1:p1", "term_x; rm -rf /"));
   assert.throws(() => attachCommand(BINS, "w1:p1;x", "term_abc"));
 });
@@ -241,4 +249,16 @@ test("a waiter whose event was already covered by a later-started sync skips", (
   saveState(dirs.stateDir, { ...emptyState(), lastSyncStartedAt: 500 });
   assert.equal(sync(w, orca, dirs, { coalesce: true, startedAt: 400 }).skipped, "coalesced");
   assert.equal(sync(w, orca, dirs, { coalesce: true, startedAt: 600 }).skipped, null);
+});
+
+test("non-git panes inside a registered Orca folder project mirror into that folder project", () => {
+  const w = makeWorld({
+    panes: [{ paneId: "w1:p1", terminalId: "term_folder1", workspaceId: "w1", tabId: "w1:t1", cwd: "F:\\codexworkspace" }],
+    workspaces: [{ workspaceId: "w1", label: "codexworkspace" }],
+    repos: [{ id: "r_f", path: "F:\\", externalWorktreeVisibility: null, kind: "folder" }],
+  });
+  const orca = fakeOrca(w);
+  const r = sync(w, orca, tempDirs());
+  assert.equal(r.created.length, 1);
+  assert.equal(r.created[0]?.worktreePath, "F:\\");
 });

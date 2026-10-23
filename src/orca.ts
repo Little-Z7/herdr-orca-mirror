@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { asRecord, parseJson, str, type Runner } from "./run.ts";
 
@@ -11,7 +12,7 @@ export type OrcaTerminal = {
   agentIdentity?: string | null;
   preview?: string | null;
 };
-export type OrcaRepo = { id: string; path: string; externalWorktreeVisibility: string | null };
+export type OrcaRepo = { id: string; path: string; externalWorktreeVisibility: string | null; kind?: string | null };
 export type SplitDirection = "horizontal" | "vertical";
 export type CreatedTerminal = { handle: string; paneKey: string | null };
 
@@ -63,7 +64,8 @@ export function parseRepoList(value: unknown): OrcaRepo[] {
     const r = asRecord(item);
     const id = str(r, "id");
     const path = str(r, "path");
-    return id && path ? [{ id, path, externalWorktreeVisibility: str(r, "externalWorktreeVisibility") }] : [];
+    const kind = str(r, "kind");
+    return id && path ? [{ id, path, externalWorktreeVisibility: str(r, "externalWorktreeVisibility"), ...(kind ? { kind } : {}) }] : [];
   });
 }
 
@@ -92,6 +94,12 @@ export type OrcaCli = {
 export function orcaAppFromLauncher(launcherRealPath: string): string | null {
   const i = launcherRealPath.indexOf(".app/");
   return i === -1 ? null : launcherRealPath.slice(0, i + 4);
+}
+
+/** `<OrcaDir>` resolved from the Windows `orca` launcher, which lives at `<OrcaDir>\resources\bin\orca.exe`. */
+export function orcaWinDirFromLauncher(launcherPath: string): string | null {
+  const m = launcherPath.replace(/\\/g, "/").match(/^(.*)\/resources\/bin\/orca(?:\.(?:exe|cmd))?$/i);
+  return m?.[1] ? launcherPath.slice(0, m[1].length) : null;
 }
 
 export function orcaCli(run: Runner, bin = "orca"): OrcaCli {
@@ -151,14 +159,25 @@ export function orcaCli(run: Runner, bin = "orca"): OrcaCli {
       call(["terminal", "close", "--terminal", handle, "--tab"]);
     },
     importWorktree(repoId, path) {
-      const launcher = run(["/bin/sh", "-c", `readlink -f "$(command -v ${bin})"`], { timeoutMs: 5_000 }).stdout.trim();
-      const app = orcaAppFromLauncher(launcher);
-      if (!app) throw new OrcaCommandError(`cannot locate Orca.app from ${launcher || bin}`, false);
       const script = fileURLToPath(new URL("./orca-rpc.cjs", import.meta.url));
+      let rpcArgs: string[];
+      if (process.platform === "win32") {
+        const launcher = orcaWinDirFromLauncher(bin)
+          ? bin
+          : (run(["where.exe", bin], { timeoutMs: 5_000 }).stdout.split(/\r?\n/)[0]?.trim() ?? "");
+        const dir = orcaWinDirFromLauncher(launcher);
+        if (!dir) throw new OrcaCommandError(`cannot locate Orca install from ${launcher || bin}`, false);
+        rpcArgs = [join(dir, "Orca.exe"), script, join(dir, "resources/app.asar.unpacked/out/cli")];
+      } else {
+        const launcher = run(["/bin/sh", "-c", `readlink -f "$(command -v ${bin})"`], { timeoutMs: 5_000 }).stdout.trim();
+        const app = orcaAppFromLauncher(launcher);
+        if (!app) throw new OrcaCommandError(`cannot locate Orca.app from ${launcher || bin}`, false);
+        rpcArgs = ["/usr/bin/env", "ELECTRON_RUN_AS_NODE=1", `${app}/Contents/MacOS/Orca`, script, `${app}/Contents/Resources/app.asar.unpacked/out/cli`];
+      }
       const rpc = (method: string, params: unknown): Record<string, unknown> => {
-        const cliDir = `${app}/Contents/Resources/app.asar.unpacked/out/cli`;
-        const r = run(["/usr/bin/env", "ELECTRON_RUN_AS_NODE=1", `${app}/Contents/MacOS/Orca`, script, cliDir, method, JSON.stringify(params)], {
+        const r = run([...rpcArgs, method, JSON.stringify(params)], {
           timeoutMs: 30_000,
+          ...(process.platform === "win32" ? { env: { ELECTRON_RUN_AS_NODE: "1" } } : {}),
         });
         const envelope = asRecord(parseJson(r.stdout));
         if (envelope?.ok === true) return asRecord(envelope.result) ?? {};

@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
-import { parseAttachCandidates, parseEnvLines, scanAttachProcesses } from "../src/procscan.ts";
-import type { Runner } from "../src/run.ts";
+import {
+  parseAttachCandidates,
+  parseEnvLines,
+  readRecordedAttachProcesses,
+  recordAttachProcess,
+  removeAttachProcess,
+  scanAttachProcesses,
+} from "../src/procscan.ts";
+import { defaultRunner, type Runner } from "../src/run.ts";
 
 test("only the herdr attach leaf counts, whether launched by name or absolute path", () => {
   const ps = [
@@ -51,4 +61,17 @@ test("scanAttachProcesses reads env only for attach pids and reports missing env
 
 test("a failing ps aborts the scan instead of reporting nothing attached", () => {
   assert.throws(() => scanAttachProcesses(() => ({ status: 1, stdout: "", stderr: "boom" })), /ps failed/);
+});
+
+test("recorded attach files track live attach loops on Windows and prune dead pids", () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "orca-mirror-proc-"));
+  recordAttachProcess(stateDir, { pid: 1001, terminalId: "term_live", paneId: "w1:p1", paneKey: "t1:l1", inOrca: true });
+  recordAttachProcess(stateDir, { pid: 1002, terminalId: "term_dead", paneId: "w1:p2", paneKey: "t2:l2", inOrca: true });
+  const alive = (pid: number) => pid === 1001;
+  assert.deepEqual(scanAttachProcesses(defaultRunner, { stateDir, platform: "win32", alive }), [
+    { pid: 1001, terminalId: "term_live", paneId: "w1:p1", paneKey: "t1:l1", inOrca: true },
+  ]);
+  assert.equal(readRecordedAttachProcesses(stateDir, () => true).length, 1);
+  removeAttachProcess(stateDir, 1001);
+  assert.deepEqual(readRecordedAttachProcesses(stateDir, () => true), []);
 });

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 export type RunResult = { status: number | null; stdout: string; stderr: string; error?: string };
-export type Runner = (argv: string[], opts?: { timeoutMs?: number }) => RunResult;
+export type Runner = (argv: string[], opts?: { timeoutMs?: number; env?: NodeJS.ProcessEnv }) => RunResult;
 
 export const defaultRunner: Runner = (argv, opts = {}) => {
   const [cmd, ...args] = argv;
@@ -10,6 +10,8 @@ export const defaultRunner: Runner = (argv, opts = {}) => {
     encoding: "utf8",
     timeout: opts.timeoutMs ?? 30_000,
     maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
+    ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
   });
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "", error: r.error?.message };
 };
@@ -40,4 +42,8 @@ export function num(rec: Record<string, unknown> | null, key: string): number | 
 
 export function shQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+export function psQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
 }
